@@ -11,6 +11,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  # Opt into Node 24 ahead of the June 2026 deprecation cutover.
+  # Remove once all action versions ship Node 24 natively.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
