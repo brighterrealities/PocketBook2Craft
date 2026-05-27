@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Logs — PocketBook2Craft{% endblock %}
+
+{% block body %}
+<section class="panel">
+  <h2>Recent syncs</h2>
+
+  {% if not runs %}
+    <p class="muted">No sync runs yet. Trigger one from the <a href="/">Status page</a>.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Started</th>
+          <th>Duration</th>
+          <th>Result</th>
+          <th>Books</th>
+          <th>Highlights</th>
+          <th>Skipped</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td>{{ run.started_at_display }}</td>
+          <td>{{ run.duration_display }}</td>
+          <td>
+            {% if run.success %}
+              <span class="badge ok">OK</span>
+            {% else %}
+              <span class="badge err">Failed</span>
+            {% endif %}
+          </td>
+          <td>{{ run.books }}</td>
+          <td>{{ run.highlights }}</td>
+          <td>{{ run.skipped }}</td>
+        </tr>
+        {% if run.errors or run.error_message %}
+        <tr>
+          <td colspan="6" class="small muted">
+            {% if run.error_message %}{{ run.error_message }}{% endif %}
+            {% for err in run.errors %}<div>{{ err }}</div>{% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

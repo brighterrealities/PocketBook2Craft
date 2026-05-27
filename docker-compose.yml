@@ -1,0 +1,19 @@
+services:
+  pb2craft:
+    build: .
+    image: pb2craft:dev
+    container_name: pb2craft
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/config
+    environment:
+      TZ: Europe/Berlin
+      PB2C_LOG_LEVEL: INFO
+      PB2C_SYNC_INTERVAL_MINUTES: 60
+      # Seed values (optional; web UI overrides these):
+      # PB2C_PB_EMAIL: ""
+      # PB2C_PB_PASSWORD: ""
+      # PB2C_CRAFT_API_URL: ""
+      # PB2C_CRAFT_API_TOKEN: ""
+    restart: unless-stopped

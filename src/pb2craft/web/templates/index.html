@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Status — PocketBook2Craft{% endblock %}
+
+{% block body %}
+<section class="panel">
+  <h2>Connections</h2>
+  <div class="row">
+    <div>
+      <strong>PocketBook</strong>
+      {% if pb_connected %}
+        <span class="badge ok">Signed in</span>
+        {% if pb_shop %}<span class="badge">{{ pb_shop }}</span>{% endif %}
+      {% else %}
+        <span class="badge err">Not signed in</span>
+        <div class="small muted">Visit <a href="/login">Accounts</a> to sign in.</div>
+      {% endif %}
+    </div>
+    <div>
+      <strong>Craft</strong>
+      {% if craft_connected %}
+        <span class="badge ok">Configured</span>
+        <div class="small muted">Folder: <code>{{ craft_folder }}</code></div>
+      {% else %}
+        <span class="badge err">Not configured</span>
+        <div class="small muted">Visit <a href="/login">Accounts</a> to configure.</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Sync</h2>
+  <dl class="kv">
+    <dt>Last sync</dt>
+    <dd>{{ last_sync_at or "never" }}</dd>
+    <dt>Books synced</dt>
+    <dd>{{ summary.books }}</dd>
+    <dt>Highlights synced</dt>
+    <dd>{{ summary.highlights }}</dd>
+    <dt>Status</dt>
+    <dd>
+      {% if is_syncing %}
+        <span class="badge warn">Sync in progress…</span>
+      {% elif ready %}
+        <span class="badge ok">Ready</span>
+      {% else %}
+        <span class="badge err">{{ not_ready_reason }}</span>
+      {% endif %}
+    </dd>
+  </dl>
+
+  <form method="post" action="/sync">
+    <button type="submit" {% if not ready or is_syncing %}disabled{% endif %}>Sync now</button>
+    <button type="submit" name="force" value="1" class="secondary"
+            {% if not ready or is_syncing %}disabled{% endif %}>
+      Force resync
+    </button>
+  </form>
+  <p class="small muted">
+    Force resync clears local sync state. The next sync will re-discover existing
+    Craft documents by title and re-link them — no duplicates created.
+  </p>
+</section>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Accounts — PocketBook2Craft{% endblock %}
+
+{% block body %}
+<section class="panel">
+  <h2>PocketBook Cloud</h2>
+
+  {% if pb_status == 'connected' %}
+    <p><span class="badge ok">Signed in</span>
+      {% if pb_shop %}<span class="badge">{{ pb_shop }}</span>{% endif %}
+    </p>
+    <form method="post" action="/logout/pocketbook">
+      <button type="submit" class="secondary">Sign out</button>
+    </form>
+  {% else %}
+    {% if pb_error %}
+      <p class="flash err">{{ pb_error }}</p>
+    {% endif %}
+
+    {% if not pb_shops %}
+    <form method="post" action="/login/pocketbook/discover">
+      <label for="pb_email">Email</label>
+      <input type="email" id="pb_email" name="email"
+             value="{{ pb_email or '' }}" required autocomplete="email" />
+      <button type="submit">Continue</button>
+    </form>
+    {% else %}
+    <p class="small muted">Found {{ pb_shops|length }} shop{{ pb_shops|length != 1 and 's' or '' }} for <code>{{ pb_email }}</code>.</p>
+    <form method="post" action="/login/pocketbook/complete">
+      <input type="hidden" name="email" value="{{ pb_email }}" />
+
+      <label for="pb_shop">Shop</label>
+      <select id="pb_shop" name="shop_alias" required>
+        {% for shop in pb_shops %}
+        <option value="{{ shop.alias }}">{{ shop.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="pb_password">Password</label>
+      <input type="password" id="pb_password" name="password"
+             required autocomplete="current-password" />
+
+      <button type="submit">Sign in</button>
+      <a href="/login" class="btn secondary">Cancel</a>
+    </form>
+    {% endif %}
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Craft.do</h2>
+
+  {% if craft_status == 'connected' %}
+    <p><span class="badge ok">Configured</span></p>
+    <dl class="kv">
+      <dt>API URL</dt><dd><code>{{ craft_cfg.api_url }}</code></dd>
+      <dt>Folder</dt><dd><code>{{ craft_cfg.folder_name }}</code></dd>
+    </dl>
+
+    {% if craft_settings_ok %}
+      <p class="flash ok">{{ craft_settings_ok }}</p>
+    {% endif %}
+
+    <form method="post" action="/settings/craft-display">
+      <label>Quote decoration (applies to new syncs)</label>
+      <label class="inline">
+        <input type="checkbox" name="deco_focus" value="1"
+               {% if 'quote' in (craft_cfg.quote_decorations or []) %}checked{% endif %} />
+        Focus <span class="small muted">(vertical bar)</span>
+      </label>
+      <label class="inline">
+        <input type="checkbox" name="deco_block" value="1"
+               {% if 'callout' in (craft_cfg.quote_decorations or []) %}checked{% endif %} />
+        Block <span class="small muted">(surround box)</span>
+      </label>
+
+      <label>Add Craft tags (applies to new syncs)</label>
+      <label class="inline">
+        <input type="checkbox" name="tag_author" value="1"
+               {% if craft_cfg.add_author_tag %}checked{% endif %} />
+        Author <span class="small muted">(e.g. #IainMcGilchrist)</span>
+      </label>
+      <label class="inline">
+        <input type="checkbox" name="tag_publisher" value="1"
+               {% if craft_cfg.add_publisher_tag %}checked{% endif %} />
+        Publisher <span class="small muted">(e.g. #YaleUniversityPress)</span>
+      </label>
+
+      <button type="submit" class="secondary">Update display settings</button>
+    </form>
+
+    <form method="post" action="/logout/craft">
+      <button type="submit" class="secondary">Disconnect</button>
+    </form>
+  {% else %}
+    {% if craft_error %}
+      <p class="flash err">{{ craft_error }}</p>
+    {% endif %}
+    {% if craft_ok %}
+      <p class="flash ok">{{ craft_ok }}</p>
+    {% endif %}
+
+    <form method="post" action="/login/craft">
+      <label for="craft_url">API URL</label>
+      <input type="text" id="craft_url" name="api_url"
+             placeholder="https://connect.craft.do/links/…/api/v1"
+             value="{{ craft_cfg.api_url if craft_cfg else '' }}" required />
+
+      <label for="craft_token">API token</label>
+      <input type="password" id="craft_token" name="api_token"
+             required autocomplete="off" />
+
+      <label for="craft_folder">Folder name</label>
+      <input type="text" id="craft_folder" name="folder_name"
+             value="{{ craft_cfg.folder_name if craft_cfg else 'PocketBook Imports' }}" />
+
+      <label>Quote decoration</label>
+      <label class="inline">
+        <input type="checkbox" name="deco_focus" value="1" checked />
+        Focus <span class="small muted">(vertical bar)</span>
+      </label>
+      <label class="inline">
+        <input type="checkbox" name="deco_block" value="1" checked />
+        Block <span class="small muted">(surround box)</span>
+      </label>
+
+      <label>Add Craft tags to book docs</label>
+      <label class="inline">
+        <input type="checkbox" name="tag_author" value="1" />
+        Author
+      </label>
+      <label class="inline">
+        <input type="checkbox" name="tag_publisher" value="1" />
+        Publisher
+      </label>
+
+      <button type="submit">Save &amp; test</button>
+    </form>
+    <p class="small muted">
+      Create the connection in Craft → Imagine → API (choose "All Documents" + API key),
+      then paste the URL and key here.
+    </p>
+  {% endif %}
+</section>
+{% endblock %}

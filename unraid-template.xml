@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>PocketBook2Craft</Name>
+  <Repository>ghcr.io/brighterrealities/pocketbook2craft:latest</Repository>
+  <Registry>https://ghcr.io/brighterrealities/pocketbook2craft</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/brighterrealities/PocketBook2Craft/issues</Support>
+  <Project>https://github.com/brighterrealities/PocketBook2Craft</Project>
+  <Overview>
+Sync reading highlights from PocketBook Cloud to Craft.do.
+
+Pulls highlights and notes from your PocketBook e-reader's cloud library and
+writes one document per book to Craft, with the original cover image, book
+metadata (author, publisher, ISBN, language), optional #author/#publisher
+tags, and each highlight rendered as a colored quote block.
+
+Configure both services from the web UI (port 8080). Runs in the background
+on a configurable schedule and only pushes new highlights on each sync — no
+duplicates.
+
+To run a second instance (e.g. another household member with their own
+PocketBook + Craft accounts): in the Docker tab, click "Add Container",
+pick the PocketBook2Craft template from the dropdown, change Name + WebUI
+port + the /config volume path. Each instance is fully independent.
+  </Overview>
+  <Category>Productivity:</Category>
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/brighterrealities/PocketBook2Craft/main/unraid-template.xml</TemplateURL>
+  <!-- Add an icon asset (e.g. scripts/icon.png) and update this URL later. -->
+  <Icon>https://raw.githubusercontent.com/brighterrealities/PocketBook2Craft/main/scripts/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI" Target="8080" Default="8080" Mode="tcp" Description="Web UI port. Change if running multiple instances." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/pocketbook2craft" Mode="rw" Description="Persistent state directory. Holds credentials.json (chmod 600) and the SQLite sync state. Use a unique path per instance." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/pocketbook2craft</Config>
+  <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Timezone for log timestamps and the dashboard's last-sync display." Type="Variable" Display="always" Required="true" Mask="false">Europe/Berlin</Config>
+  <Config Name="Sync interval (minutes)" Target="PB2C_SYNC_INTERVAL_MINUTES" Default="60" Mode="" Description="How often the scheduler triggers a sync. Set to 0 to disable scheduled syncs (manual only)." Type="Variable" Display="always" Required="false" Mask="false">60</Config>
+  <Config Name="Log level" Target="PB2C_LOG_LEVEL" Default="INFO" Mode="" Description="Log verbosity: DEBUG, INFO, WARNING, ERROR." Type="Variable" Display="advanced" Required="false" Mask="false">INFO</Config>
+</Container>

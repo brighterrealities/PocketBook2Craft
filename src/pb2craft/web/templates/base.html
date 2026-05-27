@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}PocketBook2Craft{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="app-header">
+        <h1>PocketBook2Craft</h1>
+        <nav>
+          <a href="/" class="{% if active == 'index' %}active{% endif %}">Status</a>
+          <a href="/login" class="{% if active == 'login' %}active{% endif %}">Accounts</a>
+          <a href="/settings" class="{% if active == 'settings' %}active{% endif %}">Settings</a>
+          <a href="/logs" class="{% if active == 'logs' %}active{% endif %}">Logs</a>
+        </nav>
+      </header>
+
+      {% if flash %}
+      <div class="flash {{ flash.kind }}">{{ flash.message }}</div>
+      {% endif %}
+
+      {% block body %}{% endblock %}
+
+      <footer>
+        v{{ version }} · running on port {{ port }} · config: <code>{{ config_dir }}</code>
+      </footer>
+    </div>
+  </body>
+</html>
