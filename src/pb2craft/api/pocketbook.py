@@ -405,17 +405,27 @@ class PocketBookClient:
         _check(response)
         return response.content
 
+    # Cap on concurrent per-highlight detail fetches. Keeps wall time low on
+    # high-latency networks without hammering PocketBook's unofficial API.
+    HIGHLIGHT_FETCH_CONCURRENCY = 5
+
     async def get_highlights(self, book: Book) -> list[Highlight]:
         ids = await self.get_highlight_ids(book)
-        results: list[Highlight] = []
-        for uuid in ids:
-            raw = await self.get_highlight(uuid, fast_hash=book.fast_hash)
+        if not ids:
+            return []
+
+        semaphore = asyncio.Semaphore(self.HIGHLIGHT_FETCH_CONCURRENCY)
+
+        async def fetch(uuid: str) -> Highlight | None:
+            async with semaphore:
+                raw = await self.get_highlight(uuid, fast_hash=book.fast_hash)
             if raw is None:
-                continue
-            highlight = raw.to_highlight(book_id=book.id, book_fast_hash=book.fast_hash)
-            if highlight is not None:
-                results.append(highlight)
-        return results
+                return None
+            return raw.to_highlight(book_id=book.id, book_fast_hash=book.fast_hash)
+
+        fetched = await asyncio.gather(*(fetch(uuid) for uuid in ids))
+        # Preserve the API's ID order; drop bookmarks/404s (None).
+        return [h for h in fetched if h is not None]
 
 
 # --------------------------------------------------------------------------- #

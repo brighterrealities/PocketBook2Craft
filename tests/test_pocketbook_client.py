@@ -211,6 +211,71 @@ async def test_get_highlights_filters_bookmark_markers(client: PocketBookClient)
 
 
 @respx.mock
+async def test_get_highlights_fetches_concurrently_and_preserves_order(client: PocketBookClient):
+    """Detail fetches run concurrently (bounded) but results keep the ID order."""
+    _seed_valid_creds(client.token_store)
+    from pb2craft.models import Book
+
+    book = Book(id="b1", fast_hash="h1", title="Book")
+
+    # 12 highlight IDs — more than the concurrency cap of 5
+    ids = [{"uuid": f"n{i}"} for i in range(12)]
+    respx.get(f"{BASE}/notes").mock(return_value=httpx.Response(200, json=ids))
+
+    def _note(uuid: str) -> dict:
+        return {
+            "uuid": uuid,
+            "color": {"value": "yellow"},
+            "quotation": {
+                "begin": "epubcfi(/6/14!/4/2/1:0)",
+                "end": "epubcfi(/6/14!/4/2/1:10)",
+                "text": f"text for {uuid}",
+            },
+            "mark": {"anchor": "pbr:/page?page=1"},
+        }
+
+    for i in range(12):
+        respx.get(f"{BASE}/notes/n{i}").mock(
+            return_value=httpx.Response(200, json=_note(f"n{i}"))
+        )
+
+    highlights = await client.get_highlights(book)
+
+    assert len(highlights) == 12
+    # Order follows the ID list, not completion order
+    assert [h.uuid for h in highlights] == [f"n{i}" for i in range(12)]
+
+
+@respx.mock
+async def test_get_highlights_skips_404s_in_concurrent_fetch(client: PocketBookClient):
+    _seed_valid_creds(client.token_store)
+    from pb2craft.models import Book
+
+    book = Book(id="b1", fast_hash="h1", title="Book")
+    respx.get(f"{BASE}/notes").mock(
+        return_value=httpx.Response(200, json=[{"uuid": "n1"}, {"uuid": "n2"}, {"uuid": "n3"}])
+    )
+    respx.get(f"{BASE}/notes/n1").mock(
+        return_value=httpx.Response(200, json={
+            "uuid": "n1", "color": {"value": "yellow"},
+            "quotation": {"begin": "epubcfi(/6/14!/4/2/1:0)", "end": "epubcfi(/6/14!/4/2/1:5)", "text": "keep"},
+            "mark": {"anchor": "pbr:/page?page=1"},
+        })
+    )
+    respx.get(f"{BASE}/notes/n2").mock(return_value=httpx.Response(404))
+    respx.get(f"{BASE}/notes/n3").mock(
+        return_value=httpx.Response(200, json={
+            "uuid": "n3", "color": {"value": "green"},
+            "quotation": {"begin": "epubcfi(/6/14!/4/2/1:6)", "end": "epubcfi(/6/14!/4/2/1:10)", "text": "also keep"},
+            "mark": {"anchor": "pbr:/page?page=2"},
+        })
+    )
+
+    highlights = await client.get_highlights(book)
+    assert [h.uuid for h in highlights] == ["n1", "n3"]
+
+
+@respx.mock
 async def test_get_highlight_handles_iso_timestamp(client: PocketBookClient):
     _seed_valid_creds(client.token_store)
 

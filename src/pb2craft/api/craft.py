@@ -278,6 +278,9 @@ class CraftClient:
     # HTTP plumbing                                                           #
     # ---------------------------------------------------------------------- #
 
+    # How many times to retry a 429 before giving up.
+    MAX_RATE_LIMIT_RETRIES = 3
+
     async def _request(
         self,
         method: str,
@@ -286,21 +289,34 @@ class CraftClient:
         params: dict[str, Any] | None = None,
         json: Any | None = None,
     ) -> Any:
-        await self._throttle()
-        response = await self.http.request(
-            method,
-            f"{self.api_url}{path}",
-            params=params,
-            json=json,
-            headers={
-                "Authorization": f"Bearer {self.token}",
-                "Content-Type": "application/json",
-            },
-        )
-        _check(response)
-        if response.status_code == 204 or not response.content:
-            return None
-        return response.json()
+        for attempt in range(self.MAX_RATE_LIMIT_RETRIES + 1):
+            await self._throttle()
+            response = await self.http.request(
+                method,
+                f"{self.api_url}{path}",
+                params=params,
+                json=json,
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json",
+                },
+            )
+            if response.status_code == 429 and attempt < self.MAX_RATE_LIMIT_RETRIES:
+                wait = _retry_after_seconds(response)
+                log.warning(
+                    "Craft rate-limited (attempt %d/%d); waiting %.1fs",
+                    attempt + 1,
+                    self.MAX_RATE_LIMIT_RETRIES,
+                    wait,
+                )
+                await asyncio.sleep(wait)
+                continue
+            _check(response)  # raises on 4xx/5xx (incl. a final 429)
+            if response.status_code == 204 or not response.content:
+                return None
+            return response.json()
+        # Loop exhausted without returning — _check on the last 429 raises.
+        return None  # pragma: no cover
 
     async def _throttle(self) -> None:
         async with self._throttle_lock:
@@ -314,6 +330,27 @@ class CraftClient:
 # --------------------------------------------------------------------------- #
 # Helpers                                                                      #
 # --------------------------------------------------------------------------- #
+
+
+# Cap on how long we'll honor a Retry-After before treating it as unreasonable.
+_MAX_RETRY_WAIT = 60.0
+
+
+def _retry_after_seconds(response: httpx.Response, default: float = 5.0) -> float:
+    """Seconds to wait before retrying a 429.
+
+    Prefers the standard ``Retry-After`` header (numeric seconds), then
+    Cloudflare's ``x-ratelimit-reset``, then a fixed fallback. Capped so a
+    bogus huge value can't hang the sync.
+    """
+    for header in ("Retry-After", "x-ratelimit-reset"):
+        raw = response.headers.get(header)
+        if raw:
+            try:
+                return min(max(0.0, float(raw)), _MAX_RETRY_WAIT)
+            except ValueError:
+                continue  # HTTP-date form or junk — fall through
+    return default
 
 
 # Plausible response wrappers Craft has used in different doc snippets.

@@ -183,9 +183,15 @@ async def test_401_raises_auth_error(client: CraftClient):
 
 
 @respx.mock
-async def test_429_raises_rate_limited(client: CraftClient):
-    respx.post(f"{API_URL}/blocks").mock(
-        return_value=httpx.Response(429, headers={"Retry-After": "30"})
+async def test_persistent_429_raises_rate_limited(client: CraftClient, monkeypatch):
+    """Every attempt returns 429 → retries exhausted → CraftRateLimited."""
+    # Don't actually sleep through the backoff in tests.
+    async def _no_sleep(_seconds):
+        pass
+    monkeypatch.setattr("pb2craft.api.craft.asyncio.sleep", _no_sleep)
+
+    route = respx.post(f"{API_URL}/blocks").mock(
+        return_value=httpx.Response(429, headers={"Retry-After": "1"})
     )
 
     with pytest.raises(CraftRateLimited):
@@ -193,6 +199,47 @@ async def test_429_raises_rate_limited(client: CraftClient):
             document_id="doc-1",
             blocks=[{"type": "text", "markdown": "x"}],
         )
+    # Initial attempt + MAX_RATE_LIMIT_RETRIES retries
+    assert route.call_count == CraftClient.MAX_RATE_LIMIT_RETRIES + 1
+
+
+@respx.mock
+async def test_429_then_200_succeeds(client: CraftClient, monkeypatch):
+    """A transient 429 followed by success should retry and complete."""
+    async def _no_sleep(_seconds):
+        pass
+    monkeypatch.setattr("pb2craft.api.craft.asyncio.sleep", _no_sleep)
+
+    route = respx.get(f"{API_URL}/folders").mock(
+        side_effect=[
+            httpx.Response(429, headers={"Retry-After": "1"}),
+            httpx.Response(200, json={"folders": [{"id": "f1", "name": "X"}]}),
+        ]
+    )
+
+    folders = await client.list_folders()
+    assert [f.id for f in folders] == ["f1"]
+    assert route.call_count == 2
+
+
+def test_retry_after_prefers_header_then_reset():
+    from pb2craft.api.craft import _retry_after_seconds
+
+    # Retry-After wins
+    r = httpx.Response(429, headers={"Retry-After": "12", "x-ratelimit-reset": "60"})
+    assert _retry_after_seconds(r) == 12.0
+
+    # Falls back to x-ratelimit-reset
+    r = httpx.Response(429, headers={"x-ratelimit-reset": "30"})
+    assert _retry_after_seconds(r) == 30.0
+
+    # Falls back to default when neither present
+    r = httpx.Response(429)
+    assert _retry_after_seconds(r, default=5.0) == 5.0
+
+    # Caps absurd values
+    r = httpx.Response(429, headers={"Retry-After": "99999"})
+    assert _retry_after_seconds(r) == 60.0
 
 
 @respx.mock
